@@ -34,5 +34,10 @@ Usage: lrc.pl [options]
 [ ] make code readable  
 [ ] colored output  
 [ ] --verbose option  
+[ ] implement progress bar  
+[ ] fallback /api/search  
+
+
+
 
 

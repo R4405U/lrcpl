@@ -7,6 +7,8 @@ use LWP::UserAgent;
 use JSON;
 use URI::Escape;
 use File::Basename;
+use File::Spec;
+use File::Find;
 
 
 #Today: 11/01/2026 Sunday
@@ -24,21 +26,16 @@ Usage: lrc.pl [options]
 my $PROJ_VERSION  = "0.1.0";
 my $PROJ_NAME     = "lrcpl";
 my $PROJ_URL      = "https://github.com/R4405U/lrcpl.git";
-my $filepath;
-my $info;
-my $dir;
-my $force;
-my $help;
 
 sub help{
     return qq{Usage: $0 [options]
     Options:
         --file <path>    Download lyrics for a single music file
         --dir  <path>    Download lyrics for all music files in a folder
-      --force          Force download lyrics even if it already exists
+        --force          Force download lyrics even if it already exists
         --help           Show this help message
         --info           Print script info
-     }
+    }
 }
 
 sub write_lyrics($lrc_path, $content){
@@ -52,38 +49,44 @@ sub write_lyrics($lrc_path, $content){
 
 }
 
-sub get_by_file($path, $is_forced){
+sub fetch_metadata($path){
+    my $et        = Image::ExifTool->new;
+
+    my $info      = $et->ImageInfo($path);
+
+    my $artist    = $info->{Artist} // $info->{Author} // "Unknown";
+    my $title     = $info->{Title}  // "Unknown";
+    my $album     = $info->{Album} // "Unknown"; 
+    my $raw_dur   = $info->{Duration} // 0;
+    my $duration   = 0;
+    
+if ($raw_dur =~ /^(?:(?:(\d+):)?(\d+):)?(\d+(?:\.\d+)?)$/) {
+        $duration = ($1 // 0) * 3600 + ($2 // 0) * 60 + ($3 // 0);
+    } else {
+        $raw_dur =~ s/[^\d\.]//g;
+        $duration = $raw_dur || 0;
+    }
+    return ($artist,$title,$album,$duration);
+}
+
+sub get_by_file($ua,$path, $is_forced){
     if (! -f $path){
         warn "File not found: $path\n";
         die help();
     }
 
     my ($name, $file_path, $suffix) = fileparse($path, qr/\.[^.]*$/);
-    my $lrc_path = $file_path . $name . ".lrc";
+    my $lrc_path = File::Spec->catfile($file_path,"$name.lrc");
 
     if(-e $lrc_path && !$is_forced){
       say "Skipping: Lyrics already exist for $path";
       return;
     }
 
-    my $et = Image::ExifTool->new;
+    my ($artist,$title,$album,$duration) = fetch_metadata($path);
 
-    my $info     = $et->ImageInfo($path);
+    # TODO: Fallback if tags are missing;
 
-    my $artist   = $info->{Artist} // $info->{Author} // "Unknown";
-    my $title    = $info->{Title}  // "Unknown";
-    my $album    = $info->{Album} // "Unknown"; 
-    my $duration = $info->{Duration} // 0;
-    
-    if ($duration =~ /:/) {
-        my @parts = reverse split /:/, $duration;
-        $duration = 0;
-        $duration += $parts[0] // 0;      # seconds
-        $duration += ($parts[1] // 0) * 60;   # minutes
-        $duration += ($parts[2] // 0) * 3600; # hours
-    } else {
-        $duration =~ s/[^\d\.]//g; # Remove " s" or other text
-    }
     say "\n\nFetching lyrics for: ";
     say "Artist: $artist";
     say "Title:  $title";
@@ -98,24 +101,17 @@ sub get_by_file($path, $is_forced){
       int($duration)
     );
 
-    my $header = sprintf(
-      "%s v%s (%s)",
-      $PROJ_NAME,
-      $PROJ_VERSION,
-      $PROJ_URL
-    );
+
     
     say "Fetching url: $url";
-    my $ua = LWP::UserAgent->new;
-    $ua->agent($header);
-    $ua->timeout(30);
     
     my $response = $ua->get($url, "Accept" => "application/json");
 
     if($response->is_success){
       my $content = decode_json($response->decoded_content);
       my $synced_lyrics = $content->{syncedLyrics};
-      my $plain_lyrics = $content->{plainLyrics};
+      my $plain_lyrics  = $content->{plainLyrics};
+      my $instrumental  = $content->{instrumental};
 
       if($synced_lyrics){
         say "Found synced lyrics";
@@ -124,6 +120,9 @@ sub get_by_file($path, $is_forced){
       elsif($plain_lyrics){
         say "Found plain lyrics";
         write_lyrics($lrc_path,$plain_lyrics);
+      }
+      elsif($instrumental){
+        say "Instrumental music, no lyrics available";
       }
       else{
         warn "No lyrics found";
@@ -141,45 +140,69 @@ sub get_by_file($path, $is_forced){
     }
 
 }
-sub get_by_dir($path,$is_forced){
-    opendir(my $dh, $path) or die "Can't open $path: $!";
-    while (my $entry = readdir($dh)){
-        next if $entry =~ /^\./;
-        next unless $entry =~ /\.(mp3|flac|m4a)$/i;
-        get_by_file("$path/$entry",$is_forced);
-    }
-    closedir($dh);
+sub get_by_dir($ua,$path,$is_forced){
+  
+    find(sub {
+        return unless -f $_ && /\.(mp3|flac|m4a|ogg|wav)$/i;
+        get_by_file($ua,$File::Find::name, $is_forced);
+      },$path);
+
+
+
+
+
+    # opendir(my $dh, $path) or die "Can't open $path: $!";
+    # while (my $entry = readdir($dh)){
+    #     next if $entry =~ /^\./;
+    #     next unless $entry =~ /\.(mp3|flac|m4a)$/i;
+    #     get_by_file($ua,"$path/$entry",$is_forced);
+    # }
+    # closedir($dh);
 }
 
 
 
 sub main{
+    my %opts;
     GetOptions(
-        "file=s"  =>    \$filepath,
-        "dir=s"   =>    \$dir,
-        "help"    =>    \$help,
-        "info"    =>    \$info,
-        "force"   =>    \$force
+        "file=s"  =>    \$opts{filepath},
+        "dir=s"   =>    \$opts{dir},
+        "help"    =>    \$opts{help},
+        "info"    =>    \$opts{info},
+        "force"   =>    \$opts{force}
     ) or die help();
-    if ($filepath && $dir) {
+
+    my $header = sprintf(
+      "%s v%s (%s)",
+      $PROJ_NAME,
+      $PROJ_VERSION,
+      $PROJ_URL
+    );
+    my $ua = LWP::UserAgent->new(
+      "timeout" => 30,
+      "agent"   => $header,
+    );
+    if ($opts{filepath} && $opts{dir}) {
         die "Error: Please provide either --file OR --dir, not both at once.\n";
     }
 
-    if (!$filepath && !$dir && !$help && !$info) {
+    if (!$opts{filepath} && !$opts{dir} && !$opts{help} && !$opts{info}) {
         die "Error: You must provide either --file or --dir.\nTry --help for more information.\n";
     }
 
-    if($help){
+
+
+    if($opts{help}){
         say help();
     }
-    elsif($info){
+    elsif($opts{info}){
       say "$PROJ_NAME\nv$PROJ_VERSION\n$PROJ_URL";
     }
-    elsif($filepath){
-        get_by_file($filepath,$force);
+    elsif($opts{filepath}){
+        get_by_file($ua,$opts{filepath},$opts{force});
     }
-    elsif($dir){
-        get_by_dir($dir, $force);
+    elsif($opts{dir}){
+        get_by_dir($ua,$opts{dir}, $opts{force});
     }
 }
 
