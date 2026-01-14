@@ -1,5 +1,5 @@
-!> [!WARNING]
-> --verbose, -v, -vv is not fully developed, restrain from using it.
+> [!NOTE]
+> --verbose, -v, -vv is not fully developed yet, restrain from using it.
 
 # lrc.pl
 Perl script to fetch and download lyrics from [LRCLIB](https://lrclib.net/) using [LRCLIB API](https://lrclib.net/docs)
