@@ -29,7 +29,7 @@ or via your system package manager
 
 
 # Help
-`
+```
 Usage: lrc.pl [options]  
   Options:
       -f, --file            <path>    Download lyrics for a specific music file.
@@ -38,7 +38,7 @@ Usage: lrc.pl [options]
       --force                         Overwrite existing .lrc files.
       -h, --help                      Show this help message.
       -i, --info                      Print script info.
-`
+```
 
 ## Example
 

@@ -188,6 +188,7 @@ sub get_by_dir( $ua, $path, $is_forced, $v_level ) {
     }
     say "\nDone!\n";
 
+    #FIXME: 
     say "$_: $messages{$_}" for (keys(%messages));
 }
 
