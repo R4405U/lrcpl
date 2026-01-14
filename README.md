@@ -1,5 +1,13 @@
+!> [!WARNING]
+> --verbose, -v, -vv is not fully developed, restrain from using it.
+
 # lrc.pl
-perl script to fetch lyrics from LRCLIB using LRCLIB API
+Perl script to fetch and download lyrics from [LRCLIB](https://lrclib.net/) using [LRCLIB API](https://lrclib.net/docs)
+
+[![Demo](demo.gif)]()
+
+
+
 
 Today:   11/01/2026 Sunday
 
@@ -17,25 +25,33 @@ You can install all these using given below command
 cpanm --installdeps .
 ```
 
-or you can install using your native distro package manager
+or via your system package manager
 
 
 # Help
+`
 Usage: lrc.pl [options]  
-  Options:  
-      --file <path>    Download lyrics for a single music file  
-      --dir  <path>    Download lyrics for all music files in a folder  
-      --force          Force download lyrics even if it already exists  
-      --help           Show this help message  
-      --info           Print script info  
+  Options:
+      -f, --file            <path>    Download lyrics for a specific music file.
+      -d, --dir             <path>    Scan a directory and download lyrics for all music files inside.
+      -v, -vv, --verbose              Show detailed debug information.
+      --force                         Overwrite existing .lrc files.
+      -h, --help                      Show this help message.
+      -i, --info                      Print script info.
+`
 
+## Example
+
+```bash
+perl -d "~/Music/"
+```
 
 # TODO:
-[ ] make code readable  
+[ ] Stabilize --verbose logging.
 [ ] colored output  
-[ ] --verbose option  
-[ ] implement progress bar  
 [ ] fallback /api/search  
+[ ] make code readable  
+[x] implement progress bar  
 
 
 
